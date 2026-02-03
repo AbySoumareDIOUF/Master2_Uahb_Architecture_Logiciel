@@ -4,6 +4,8 @@ import com.uahb.scolarite.app.domain.exception.ScolariteException;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AnneeAcademique {
 
@@ -14,14 +16,57 @@ public class AnneeAcademique {
     private  LocalDate dateFermetureInscription;
     private  LocalDate datePublication;
     private  Statut statut;
+    private static final int DUREE_ANNEE_SCOLAIRE_MOIS = 9;
+    private List<MoisAcademique> moisAcademiqueList;
 
-    public AnneeAcademique(AnneeAcademiqueId anneeAcademiqueId, Statut statut) {
+    public AnneeAcademique(AnneeAcademiqueId anneeAcademiqueId) {
         this.anneeAcademiqueId = anneeAcademiqueId;
         this.statut=Statut.BROUILLON;
     }
 
     public void creer(CalendrierScolaire calendrierScolaire){
         initialiserDate(calendrierScolaire);
+        verifierNombreDeMoisScolaire();
+        moisAcademiqueList = genererMoisAcademique();
+    }
+
+    public void modifier(CalendrierScolaire calendrierScolaire){
+        verifierStatut("modifier" ,Statut.BROUILLON);
+        initialiserDate(calendrierScolaire);
+        verifierNombreDeMoisScolaire();
+        moisAcademiqueList = genererMoisAcademique();
+    }
+
+    public void publier(LocalDate datePublication){
+        verifierStatut("publier", Statut.BROUILLON);
+        this.datePublication = datePublication;
+        this.statut = Statut.PUBLIEE;
+    }
+
+    public void ouvertureInscription(CalendrierScolaire calendrierScolaire){
+        verifierStatut("ouvrir inscription", Statut.PUBLIEE);
+        this.statut = Statut.INSCRIPTIONS_OUVERTES;
+    }
+
+    public void suspendreInscription(CalendrierScolaire calendrierScolaire){
+        verifierStatut("suspendre inscription", Statut.INSCRIPTIONS_OUVERTES);
+        this.statut = Statut.INSCRIPTION_SUSPENDUES;
+
+    }
+
+    public void reouvrirInscription(CalendrierScolaire calendrierScolaire){
+        verifierStatut("Re-ouvrir inscription", Statut.INSCRIPTION_SUSPENDUES);
+        this.statut = Statut.INSCRIPTIONS_OUVERTES;
+    }
+
+    public void fermerInscription(CalendrierScolaire calendrierScolaire){
+        verifierStatut("Fermer inscription", Statut.INSCRIPTIONS_OUVERTES);
+        this.statut = Statut.INSCRIPTIONS_FERMEES;
+    }
+
+    public void cloturerAnnee(CalendrierScolaire calendrierScolaire){
+        verifierStatut("Cloturer année", Statut.INSCRIPTIONS_FERMEES);
+        this.statut = Statut.CLOTUREE;
     }
 
     private void initialiserDate(CalendrierScolaire calendrierScolaire){
@@ -41,13 +86,17 @@ public class AnneeAcademique {
             throw new ScolariteException("La date d'arret des inscriptions doit etre postérieure au debut de l'année ");
         }
 
-        if (!calendrierScolaire.getDateOuvertureInscription().isAfter(calendrierScolaire.getDateFermeture())){
+        if (calendrierScolaire.getDateOuvertureInscription().isAfter(calendrierScolaire.getDateFermeture())){
             throw new ScolariteException("La date de d'arret des inscriptions doit etre antérieure ou égale à la fin de l'année");
         }
+        dateOuverture = calendrierScolaire.getDateOuverture();
+        dateFermeture = calendrierScolaire.getDateFermeture();
+        dateOuvertureInscription = calendrierScolaire.getDateOuvertureInscription();
+        dateFermetureInscription = calendrierScolaire.getDateFermetureInscription();
 
     }
 
-    private void verifierMoisAnneeScolaire(){
+    private void verifierNombreDeMoisScolaire(){
         long mois = ChronoUnit.MONTHS.between(
                 dateOuverture.withDayOfMonth(1),
                 dateFermeture.withDayOfMonth(1)
@@ -57,11 +106,27 @@ public class AnneeAcademique {
             mois++;
         }
 
-        if (mois != 9) {
+        if (mois != DUREE_ANNEE_SCOLAIRE_MOIS) {
             throw new ScolariteException(
                     "Une année scolaire doit couvrir exactement "
-                            + 9 + " mois"
+                            + DUREE_ANNEE_SCOLAIRE_MOIS + " mois"
             );
+        }
+    }
+    
+    private  List<MoisAcademique> genererMoisAcademique(){
+        List<MoisAcademique> moisAcademiqueList = new ArrayList<>();
+        LocalDate resetDateActuelle = dateOuverture.withDayOfMonth(1);
+        for (int i = 0 ; i < DUREE_ANNEE_SCOLAIRE_MOIS ; i++) {
+            moisAcademiqueList.add(new MoisAcademique(resetDateActuelle.getMonthValue(), resetDateActuelle.getYear()));
+            resetDateActuelle =resetDateActuelle.plusMonths(1);
+        }
+        return  moisAcademiqueList;
+    }
+
+    private void verifierStatut(String action,Statut statut){
+        if (statut != this.statut) {
+            throw new ScolariteException("Action interdite : " + action + " dans l'état " + statut);
         }
     }
 
